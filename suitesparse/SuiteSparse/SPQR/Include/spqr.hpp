@@ -20,11 +20,11 @@
 // #include <cstring>
 #include <string.h>
 
-// #include <complex>
-// typedef std::complex<double> Complex ;
+#include <complex>
+typedef std::complex<double> Complex ;
 
-#include <complex.h>
-typedef double complex Complex;
+//#include <complex.h>
+//typedef double _Complex Complex;
 
 // -----------------------------------------------------------------------------
 // debugging and printing control
@@ -955,7 +955,7 @@ inline double spqr_abs (double x, cholmod_common *cc)       // cc is unused
 
 inline double spqr_abs (Complex x, cholmod_common *cc)
 {
-    return (SuiteSparse_config.hypot_func (creal(x), cimag(x))) ;
+    return (SuiteSparse_config.hypot_func (x.real(), x.imag())) ;
 }
 
 
@@ -972,7 +972,7 @@ inline Complex spqr_divide (Complex a, Complex b, cholmod_common *cc)
 {
     double cr, ci;
     SuiteSparse_config.divcomplex_func
-        (creal(a), cimag(a), creal(b), cimag(b), &cr, &ci) ;
+        (a.real(), a.imag(), b.real(), b.imag(), &cr, &ci) ;
     // Complex ret = cr + ci * I;
     Complex ret; // cggos 20200604
     return (ret) ;
