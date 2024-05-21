@@ -11,7 +11,7 @@
 % umfpack_solve   - x = A\b or x = b/A
 % lu_normest      - estimates norm (L*U-A, 1) without forming L*U-A
 % luflop          - given L and U, computes # of flops required to compute them
-% umfpack_test    - for testing umfpack (requires UFget)
+% umfpack_test    - for testing umfpack (requires ssget)
 %
 % Example:
 %   x = umfpack (A, '\', b) ;   % same as x = A\b, if A square and unsymmetric
@@ -23,6 +23,6 @@
 % symamd            symmetric approx minimum degree ordering, based on colamd
 %
 % Copyright 1995-2009 by Timothy A. Davis.
-% All Rights Reserved.  Type umfpack_details for License.
+% All Rights Reserved.  See UMFPACK/Doc/License.txt for License.
 
 help Contents

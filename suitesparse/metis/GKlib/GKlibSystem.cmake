@@ -28,8 +28,6 @@ if(CYGWIN)
 endif(CYGWIN)
 if(CMAKE_COMPILER_IS_GNUCC)
 # GCC opts.
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -mtune=generic-ARMv7-a -mfpu=neon")
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -mtune=generic-ARMv7-a -mfpu=neon")
   set(GKlib_COPTIONS "${GKlib_COPTIONS} -std=c99 -fno-strict-aliasing")
   if(NOT MINGW)
       set(GKlib_COPTIONS "${GKlib_COPTIONS} -fPIC")

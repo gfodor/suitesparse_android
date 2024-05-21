@@ -1182,15 +1182,15 @@ template <typename Entry> Long SuiteSparseQR     // returns rank(A) estimate
     cholmod_common *cc      // workspace and parameters
 )
 {
-    cholmod_sparse *csI ;
+    cholmod_sparse *I ;
     Long xtype = spqr_type <Entry> ( ) ;
     RETURN_IF_NULL_COMMON (EMPTY) ;
     RETURN_IF_NULL (A, EMPTY) ;
     Long m = A->nrow ;
-    csI = cholmod_l_speye (m, m, xtype, cc) ;
-    Long rank = (csI == NULL) ? EMPTY : SuiteSparseQR <Entry> (ordering, tol,
-        econ, 1, A, csI, NULL, Q, NULL, R, E, NULL, NULL, NULL, cc) ;
-    cholmod_l_free_sparse (&csI, cc) ;
+    I = cholmod_l_speye (m, m, xtype, cc) ;
+    Long rank = (I == NULL) ? EMPTY : SuiteSparseQR <Entry> (ordering, tol,
+        econ, 1, A, I, NULL, Q, NULL, R, E, NULL, NULL, NULL, cc) ;
+    cholmod_l_free_sparse (&I, cc) ;
     return (rank) ;
 }
 

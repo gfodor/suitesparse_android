@@ -15,8 +15,8 @@
 # CSparse/Lib.  It does not install it for system-wide usage.
 
 LIBRARY = libcsparse
+CF = $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -O
 
-CF = $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -O -fPIC
 I = -I../Include
 RANLIB = ranlib
 ARCHIVE = $(AR) $(ARFLAGS)
@@ -40,6 +40,8 @@ $(CS): ../Include/cs.h Makefile
 
 %.o: ../Source/%.c ../Include/cs.h
 	$(CC) $(CF) $(I) -c $<
+
+static: $(AR_TARGET)
 
 $(AR_TARGET): $(CS)
 	$(ARCHIVE)  $@ $^

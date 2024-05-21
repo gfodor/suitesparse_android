@@ -4,7 +4,7 @@
 
 /* -------------------------------------------------------------------------- */
 /* Copyright (c) 2005-2012 by Timothy A. Davis, http://www.suitesparse.com.   */
-/* All Rights Reserved.  See ../Doc/License for License.                      */
+/* All Rights Reserved.  See ../Doc/License.txt for License.                  */
 /* -------------------------------------------------------------------------- */
 
 int umfpack_di_symbolic
@@ -264,6 +264,11 @@ Arguments:
 	    during numeric factorization.  If < 0, then Q may be modified.  If
 	    zero, then this is controlled automatically (the unsymmetric
 	    strategy modifies Q, the others do not).  Default: 0.
+
+            Note that the symbolic analysis will in general modify the input
+            ordering Qinit to obtain Q; see umfpack_qsymbolic.h for details.
+            This option ensures Q does not change, as found in the symbolic
+            analysis, but Qinit is in general not the same as Q.
 
 	Control [UMFPACK_AGGRESSIVE]:  If nonzero, aggressive absorption is used
 	    in COLAMD and AMD.  Default: 1.

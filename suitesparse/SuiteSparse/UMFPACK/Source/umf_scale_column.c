@@ -4,7 +4,7 @@
 
 /* -------------------------------------------------------------------------- */
 /* Copyright (c) 2005-2012 by Timothy A. Davis, http://www.suitesparse.com.   */
-/* All Rights Reserved.  See ../Doc/License for License.                      */
+/* All Rights Reserved.  See ../Doc/License.txt for License.                  */
 /* -------------------------------------------------------------------------- */
 
 /*
@@ -30,7 +30,6 @@
 PRIVATE void shift_pivot_row (Entry *Fd, Entry *Fs, Entry *Fe, Int len, Int d)
 {
     Int j ;
-#pragma ivdep
     for (j = 0 ; j < len ; j++)
     {
 	Fd [j]   = Fs [j*d] ;

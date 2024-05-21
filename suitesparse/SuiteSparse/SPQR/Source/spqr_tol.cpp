@@ -5,8 +5,8 @@
 // Return the default column 2-norm tolerance
 
 #include "spqr.hpp"
-// #include <limits>
-// #include <algorithm>
+#include <limits>
+#include <algorithm>
 
 // return the default tol (-1 if error)
 template <typename Entry> double spqr_tol
@@ -25,8 +25,7 @@ template <typename Entry> double spqr_tol
     // MathWorks modification: if the tolerance becomes Inf, replace it with
     // realmax; otherwise, we may end up with an all-zero matrix R
     // (see g1284493)
-    // tol = min(tol, std::numeric_limits<double>::max());
-    if(tol > DBL_MAX) tol = DBL_MAX;
+    tol = std::min(tol, std::numeric_limits<double>::max());
     
     return (tol) ;
 }

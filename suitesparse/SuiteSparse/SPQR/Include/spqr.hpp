@@ -17,14 +17,10 @@
 #include <math.h>
 #include <float.h>
 #include <stdio.h>
-// #include <cstring>
-#include <string.h>
+#include <cstring>
 
 #include <complex>
 typedef std::complex<double> Complex ;
-
-//#include <complex.h>
-//typedef double _Complex Complex;
 
 // -----------------------------------------------------------------------------
 // debugging and printing control
@@ -940,7 +936,7 @@ inline double spqr_conj (double x)
 
 inline Complex spqr_conj (Complex x)
 {
-    return (conj (x)) ;
+    return (std::conj (x)) ;
 }
 
 
@@ -955,7 +951,7 @@ inline double spqr_abs (double x, cholmod_common *cc)       // cc is unused
 
 inline double spqr_abs (Complex x, cholmod_common *cc)
 {
-    return (SuiteSparse_config.hypot_func (x.real(), x.imag())) ;
+    return (SuiteSparse_config.hypot_func (x.real ( ), x.imag ( ))) ;
 }
 
 
@@ -970,12 +966,10 @@ inline double spqr_divide (double a, double b, cholmod_common *cc)  // cc unused
 
 inline Complex spqr_divide (Complex a, Complex b, cholmod_common *cc)
 {
-    double cr, ci;
+    double creal, cimag ;
     SuiteSparse_config.divcomplex_func
-        (a.real(), a.imag(), b.real(), b.imag(), &cr, &ci) ;
-    // Complex ret = cr + ci * I;
-    Complex ret; // cggos 20200604
-    return (ret) ;
+        (a.real(), a.imag(), b.real(), b.imag(), &creal, &cimag) ;
+    return (Complex (creal, cimag)) ;
 }
 
 
