@@ -1,0 +1,2 @@
+	$(C) -c ../Source/colamd.c
+	$(C) -DDLONG -c ../Source/colamd.c -o colamd_l.o

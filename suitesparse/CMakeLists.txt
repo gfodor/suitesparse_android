@@ -5,32 +5,69 @@
 # Updated by jesnault (jerome.esnault@inria.fr) 2014-01-21
 # -----------------------------------------------------------------
 
+option(HUNTER_ENABLED "Enable Hunter package manager support" OFF)
+include(cmake/HunterGate.cmake)
+
+HunterGate(
+  URL "https://github.com/ruslo/hunter/archive/v0.23.214.tar.gz"
+  SHA1 "e14bc153a7f16d6a5eeec845fb0283c8fad8c358"
+)
+
 PROJECT(SuiteSparseProject)
 
-cmake_minimum_required(VERSION 2.8.10)
+cmake_minimum_required(VERSION 3.1)
+
+# https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html
+string(COMPARE EQUAL "${CMAKE_CXX_STANDARD}" "" no_cmake_cxx_standard_set)
+if(no_cmake_cxx_standard_set)
+  set(CMAKE_CXX_STANDARD 11)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CXX_EXTENSIONS OFF)
+  message(STATUS "Using default C++ standard ${CMAKE_CXX_STANDARD}")
+else()
+  message(STATUS "Using user specified C++ standard ${CMAKE_CXX_STANDARD}")
+endif()
 
 include(checkGetSuiteSparse.cmake)
+
+if(BUILD_SHARED_LIBS)
+	set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif(BUILD_SHARED_LIBS)
+
 
 SET(LIBRARY_OUTPUT_PATH ${${PROJECT_NAME}_BINARY_DIR}/lib CACHE PATH "Output directory for libraries" )
 SET(EXECUTABLE_OUTPUT_PATH ${${PROJECT_NAME}_BINARY_DIR}/bin CACHE PATH "Output directory for applications" )
 
-# Override "CMAKE_INSTALL_PREFIX", at least in Windows:
-IF(WIN32)
-	SET(SUITESPARSE_INSTALL_PREFIX "${${PROJECT_NAME}_BINARY_DIR}/install" CACHE PATH "Prefix prepended to install directories")
-	SET(CMAKE_INSTALL_PREFIX "${SUITESPARSE_INSTALL_PREFIX}" CACHE INTERNAL "Prefix prepended to install directories" FORCE)
-ENDIF()
+# Override "CMAKE_INSTALL_PREFIX", on Windows if not set:
+if(WIN32 AND (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT))
+	set(CMAKE_INSTALL_PREFIX "${${PROJECT_NAME}_BINARY_DIR}/install" CACHE PATH "Prefix prepended to install directories" FORCE)
+	message(STATUS "Setting default CMAKE_INSTALL_PREFIX to: ${CMAKE_INSTALL_PREFIX}")
+else()
+    # pass user defined install prefix to SuiteSparse
+    message(STATUS "Using user defined CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
+endif()
 
 # Fix GKlib path:
 IF(NOT WIN32)
 	SET(GKLIB_PATH "${${PROJECT_NAME}_SOURCE_DIR}/metis/GKlib" CACHE INTERNAL "Path to GKlib (for METIS)" FORCE)
 ENDIF()
 
-## get POSTFIX for lib install dir
+# allow creating DLLs in Windows without touching the source code:
+IF(NOT ${CMAKE_VERSION} VERSION_LESS "3.4.0" AND WIN32)
+	set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+ENDIF()
+
+## get CMAKE_INSTALL_BINDIR and CMAKE_INSTALL_LIBDIR
+include(GNUInstallDirs)
+
 if(CMAKE_SIZEOF_VOID_P MATCHES "8")
-  set(LIB_POSTFIX "64" CACHE STRING "suffix for 32/64 inst dir placement")
+  set(SUITESPARSE_LIB_POSTFIX "64")
 else()
-  set(LIB_POSTFIX "" CACHE STRING "suffix for 32/64 inst dir placement")
+  set(SUITESPARSE_LIB_POSTFIX "")
 endif()
+
+## get POSTFIX for lib install dir
+set(LIB_POSTFIX "${SUITESPARSE_LIB_POSTFIX}" CACHE STRING "suffix for 32/64 inst dir placement")
 mark_as_advanced(LIB_POSTFIX)
 
 # We want libraries to be named "libXXX" and "libXXXd" in all compilers:
@@ -40,8 +77,8 @@ IF(MSVC)
 	set(SP_LIB_PREFIX "lib")  # Libs are: "libXXX"
 ENDIF(MSVC)
 
-## check if we can build metis	
-SET(BUILD_METIS_DEFAULT OFF)	
+## check if we can build metis
+SET(BUILD_METIS_DEFAULT ON)
 IF(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/metis/CMakeLists.txt")
 	SET(BUILD_METIS_DEFAULT OFF)
 ENDIF(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/metis/CMakeLists.txt")
@@ -54,20 +91,20 @@ SET(METIS_DIR ${${PROJECT_NAME}_SOURCE_DIR}/metis CACHE PATH "Source directory o
 if(BUILD_METIS)
 	## prepare the installation :
 	## using metis target here is not possible because this target is added in another branch of the CMake structure
-	## TRICK: need to dynamically modify the metis CMakeLists.txt file before it going to parsed... 
+	## TRICK: need to dynamically modify the metis CMakeLists.txt file before it going to parsed...
 	## (very ugly/poor for a metis project get from SCM (git/svn/cvs) but it's works ;) and it doesn't matter if metis was get from .zip)
 	if(EXISTS "${METIS_DIR}/libmetis/CMakeLists.txt")
 		file(READ "${METIS_DIR}/libmetis/CMakeLists.txt" contentFile)
-		string(REGEX MATCH "EXPORT 	SuiteSparse" alreadyModified ${contentFile}) ## use a string pattern to check if we have to do the modif
+		string(REGEX MATCH "EXPORT 	SuiteSparseTargets" alreadyModified ${contentFile}) ## use a string pattern to check if we have to do the modif
 		if(NOT alreadyModified)
 			file(APPEND "${METIS_DIR}/libmetis/CMakeLists.txt"
 			"
 				set_target_properties(metis PROPERTIES PUBLIC_HEADER \"../include/metis.h\")
 				install(TARGETS metis ## this line is also the string pattern to check if the modification had already done
-						EXPORT 	SuiteSparse
-						RUNTIME DESTINATION bin
-						LIBRARY DESTINATION lib${LIB_POSTFIX}
-						ARCHIVE DESTINATION lib${LIB_POSTFIX}
+						EXPORT 	SuiteSparseTargets
+						RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+						LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+						ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 						PUBLIC_HEADER DESTINATION include
 				)
 			"
@@ -93,8 +130,7 @@ if("${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}.${CMAKE_PATCH_VERSION}" GREATE
 	endif()
 endif()
 
-
-## install_suitesparse_project(targetName headersList)  
+## install_suitesparse_project(targetName headersList)
 ## factorise the way we will install all projects (part of the suitesparse project)
 ## <targetName> is the target of the current project you build
 ## <headersList> is the list of all public headers the project use and have to be known by other projects
@@ -103,16 +139,28 @@ endif()
 ## 		add_library(<myTarget> ...)
 ## 		install_suitesparse_project(<myTarget> "${LIBHDRS}")
 macro(install_suitesparse_project targetName headersList)
+
+	## set position independend code for GCC, Clang static (and shared?) libs
+	if (NOT MINGW AND NOT MSVC)
+		target_compile_options(${targetName} PRIVATE "-fPIC")
+	endif()
+
+	## set include dir for install target
+	target_include_directories(${targetName} PUBLIC
+		$<INSTALL_INTERFACE:include>
+		$<INSTALL_INTERFACE:include/suitesparse>
+	)
+
 	set_target_properties(${targetName} PROPERTIES PUBLIC_HEADER "${headersList}")
 	install(TARGETS	${targetName}
-			EXPORT 	SuiteSparse
-			RUNTIME DESTINATION bin
-			LIBRARY DESTINATION lib${LIB_POSTFIX}
-			ARCHIVE DESTINATION lib${LIB_POSTFIX}
+			EXPORT 	SuiteSparseTargets
+			RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+			LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+			ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 			PUBLIC_HEADER DESTINATION include/suitesparse
 	)
 endmacro()
-	
+
 ## declare_suitesparse_library(targetName srcsList headersList)
 ## 	Example of use: See SuiteSparse/*/CMakeLists.txt
 macro(declare_suitesparse_library targetName srcsList headersList)
@@ -138,11 +186,11 @@ macro(declare_suitesparse_library targetName srcsList headersList)
 	ELSE(${CUDA_FOUND})
 		ADD_LIBRARY(${targetName} ${srcsList} ${headersList})
 	ENDIF(${CUDA_FOUND})
-	SET_TARGET_PROPERTIES(${targetName} PROPERTIES 
+	SET_TARGET_PROPERTIES(${targetName} PROPERTIES
 		OUTPUT_NAME ${SP_LIB_PREFIX}${targetName}
 	)
-	
-	target_link_libraries(${targetName} 
+
+	target_link_libraries(${targetName}
 			 ${dsl_TARGET_PUBLIC_LINK} suitesparseconfig ## suitesparseconfig is used for every projects (embedded into cmake build)
 		 ${dsl_TARGET_PRIVATE_LINK}	## external required libs
 	)
@@ -150,7 +198,7 @@ macro(declare_suitesparse_library targetName srcsList headersList)
 	install_suitesparse_project(${targetName} "${headersList}")
 endmacro()
 
-# Example of usage: 
+# Example of usage:
 #  REMOVE_MATCHING_FILES_FROM_LIST(".*_LIN.cpp" my_srcs)
 MACRO(REMOVE_MATCHING_FILES_FROM_LIST match_expr lst_files)
 	SET(lst_files_aux "")
@@ -162,16 +210,6 @@ MACRO(REMOVE_MATCHING_FILES_FROM_LIST match_expr lst_files)
 	SET(${lst_files} ${lst_files_aux})
 ENDMACRO(REMOVE_MATCHING_FILES_FROM_LIST)
 
-
-## check if the SHARED variable has already been defined (by the metis project) and use it for our projects
-## BUILD_SHARED_LIBS specific variable allow cmake to know what kind of lib (STATIC or SHARED) it have to build
-if(DEFINED SHARED) 
-	set(BUILD_SHARED_LIBS ${SHARED})
-else()
-	set(SHARED FALSE CACHE BOOL "Build shared libraries (.dll/.so) instead of static ones (.lib/.a)")
-	set(BUILD_SHARED_LIBS OFF)
-endif()
-
 if(WITH_CUDA)
 	FIND_PACKAGE(cuda)
 	IF(${CUDA_FOUND})
@@ -179,71 +217,93 @@ if(WITH_CUDA)
 	ENDIF(${CUDA_FOUND})
 endif()
 
-## Need to use SuiteSparse_LINKER_LAPACK_BLAS_LIBS in our subproject in case of SHARED flag is set to ON
-SET(SUITESPARSE_USE_CUSTOM_BLAS_LAPACK_LIBS ON CACHE BOOL "Check if you have custom LAPACK/BLAS libraries (AMD,...)")
-IF (SUITESPARSE_USE_CUSTOM_BLAS_LAPACK_LIBS)
-	SET(SUITESPARSE_CUSTOM_BLAS_LIB "$ENV{CLAPACKDIR}/build/BLAS/SRC/libblas.a" CACHE FILE "Path to custom library file for BLAS")
-	SET(SUITESPARSE_CUSTOM_LAPACK_LIB "$ENV{CLAPACKDIR}/build/SRC/liblapack.a" CACHE FILE "Path to custom library file for LAPACK")
-	SET(SUITESPARSE_CUSTOM_F2C_LIB "$ENV{CLAPACKDIR}/build/F2CLIBS/libf2c/libf2c.a" CACHE FILE "Path to custom library file for F2C")
-	IF (NOT EXISTS "${SUITESPARSE_CUSTOM_BLAS_LIB}" OR NOT EXISTS "${SUITESPARSE_CUSTOM_LAPACK_LIB}")
-		MESSAGE("*Error*: Correctly set SUITESPARSE_CUSTOM_BLAS_LIB and SUITESPARSE_CUSTOM_LAPACK_LIB or uncheck SUITESPARSE_USE_CUSTOM_BLAS_LAPACK_LIBS")
-	ELSE()
-		SET(SuiteSparse_LINKER_LAPACK_BLAS_LIBS ${SUITESPARSE_CUSTOM_LAPACK_LIB} ${SUITESPARSE_CUSTOM_BLAS_LIB} ${SUITESPARSE_CUSTOM_F2C_LIB})
-	ENDIF()
-ELSE()
-	IF (UNIX)
-		SET(SuiteSparse_LINKER_LAPACK_BLAS_LIBS lapack blas rt)
-	ELSE()
-		IF(CMAKE_SIZEOF_VOID_P EQUAL 8)  # Size in bytes!
-			set(PATH_WORD_SIZE "x64")
-		ELSE(CMAKE_SIZEOF_VOID_P EQUAL 8)  # Size in bytes!
-			set(PATH_WORD_SIZE "x32")
-		ENDIF(CMAKE_SIZEOF_VOID_P EQUAL 8)
+SET(SUITESPARSE_CUSTOM_BLAS_LIB "$ENV{CLAPACKDIR}/build/BLAS/SRC/libblas.a" CACHE FILE "Path to custom library file for BLAS")
+SET(SUITESPARSE_CUSTOM_LAPACK_LIB "$ENV{CLAPACKDIR}/build/SRC/liblapack.a" CACHE FILE "Path to custom library file for LAPACK")
+SET(SUITESPARSE_CUSTOM_F2C_LIB "$ENV{CLAPACKDIR}/build/F2CLIBS/libf2c/libf2c.a" CACHE FILE "Path to custom library file for F2C")
 
-		add_library(blas SHARED IMPORTED)
-		set_property(TARGET blas PROPERTY IMPORTED_LOCATION ${SuiteSparseProject_SOURCE_DIR}/lapack_windows/${PATH_WORD_SIZE}/libblas.dll)
-		set_property(TARGET blas PROPERTY IMPORTED_IMPLIB 	${SuiteSparseProject_SOURCE_DIR}/lapack_windows/${PATH_WORD_SIZE}/libblas.lib)
-		
-		add_library(lapack SHARED IMPORTED)
-		set_property(TARGET lapack PROPERTY IMPORTED_LOCATION 	${SuiteSparseProject_SOURCE_DIR}/lapack_windows/${PATH_WORD_SIZE}/liblapack.dll)
-		set_property(TARGET lapack PROPERTY IMPORTED_IMPLIB 	${SuiteSparseProject_SOURCE_DIR}/lapack_windows/${PATH_WORD_SIZE}/liblapack.lib)
-	 
-		SET(SuiteSparse_LINKER_LAPACK_BLAS_LIBS blas lapack)
-		
-		## install lapack and blas dependencies
-		file(GLOB lapack_blas_windows_libs 	"${CMAKE_SOURCE_DIR}/lapack_windows/${PATH_WORD_SIZE}/*.lib")
-		file(GLOB lapack_blas_windows_dll 	"${CMAKE_SOURCE_DIR}/lapack_windows/${PATH_WORD_SIZE}/*.dll")
-		if(lapack_blas_windows_dll AND lapack_blas_windows_libs)
-			set(SuiteSparse_LAPACK_BLAS_LIB_DIR "lib${LIB_POSTFIX}/lapack_blas_windows") ## used in UseSuiteSparse*.cmake
-			install(FILES 		${lapack_blas_windows_libs} 
-								${lapack_blas_windows_dll}
-					DESTINATION ${SuiteSparse_LAPACK_BLAS_LIB_DIR}
-			)
-		endif()
-	ENDIF()
+IF (NOT EXISTS "${SUITESPARSE_CUSTOM_BLAS_LIB}" OR NOT EXISTS "${SUITESPARSE_CUSTOM_LAPACK_LIB}")
+  MESSAGE("*Error*: Correctly set SUITESPARSE_CUSTOM_BLAS_LIB and SUITESPARSE_CUSTOM_LAPACK_LIB or uncheck SUITESPARSE_USE_CUSTOM_BLAS_LAPACK_LIBS")
+ELSE()
+  SET(SuiteSparse_LINKER_LAPACK_BLAS_LIBS ${SUITESPARSE_CUSTOM_LAPACK_LIB} ${SUITESPARSE_CUSTOM_BLAS_LIB} ${SUITESPARSE_CUSTOM_F2C_LIB})
 ENDIF()
 
 IF(BUILD_METIS)
 	set(SuiteSparse_LINKER_METIS_LIBS "metis")
+	## namespaced library target for config
+	set(SuiteSparse_EXPORTED_METIS_LIBS "SuiteSparse::metis")
 else()
 	set(SuiteSparse_LINKER_METIS_LIBS "")
+	set(SuiteSparse_EXPORTED_METIS_LIBS "")
 ENDIF()
 
 add_subdirectory(SuiteSparse)
 
-## For find SuiteSparse from the install dir
-install(FILES 		SuiteSparseConfigForInstall.cmake
-		DESTINATION	.
-		RENAME 		SuiteSparseConfig.cmake ## This one will be the entry point for finding suitesparse from aother project using find_package()
-)
-configure_file(UseSuiteSparseForInstall.cmake.in UseSuiteSparseForInstall.cmake @ONLY)
-install(FILES 		"${CMAKE_BINARY_DIR}/UseSuiteSparseForInstall.cmake"
-		DESTINATION	.
-		RENAME 		UseSuiteSparse${LIB_POSTFIX}.cmake
-)
+macro(get_SuiteSparse_Version)
+  set(_SuiteSparse_VERSION_FILE
+	  "${CMAKE_SOURCE_DIR}/SuiteSparse/SuiteSparse_config/SuiteSparse_config.h")
+  if(NOT EXISTS ${_SuiteSparse_VERSION_FILE})
+    message(FATAL_ERROR
+      "Could not find file: ${_SuiteSparse_VERSION_FILE} containing version "
+      "information for >= v4 SuiteSparse installs.")
+  endif()
 
+  file(READ ${_SuiteSparse_VERSION_FILE} SUITESPARSE_CONFIG_CONTENTS)
+
+  string(REGEX MATCH "#define SUITESPARSE_MAIN_VERSION [0-9]+"
+    SuiteSparse_VERSION_MAJOR "${SUITESPARSE_CONFIG_CONTENTS}")
+  string(REGEX REPLACE "#define SUITESPARSE_MAIN_VERSION ([0-9]+)" "\\1"
+    SuiteSparse_VERSION_MAJOR "${SuiteSparse_VERSION_MAJOR}")
+
+  string(REGEX MATCH "#define SUITESPARSE_SUB_VERSION [0-9]+"
+    SuiteSparse_VERSION_MINOR "${SUITESPARSE_CONFIG_CONTENTS}")
+  string(REGEX REPLACE "#define SUITESPARSE_SUB_VERSION ([0-9]+)" "\\1"
+    SuiteSparse_VERSION_MINOR "${SuiteSparse_VERSION_MINOR}")
+
+  string(REGEX MATCH "#define SUITESPARSE_SUBSUB_VERSION [0-9]+"
+    SuiteSparse_VERSION_PATCH "${SUITESPARSE_CONFIG_CONTENTS}")
+  string(REGEX REPLACE "#define SUITESPARSE_SUBSUB_VERSION ([0-9]+)" "\\1"
+    SuiteSparse_VERSION_PATCH "${SuiteSparse_VERSION_PATCH}")
+
+  # set version string
+  set(SuiteSparse_VERSION
+    "${SuiteSparse_VERSION_MAJOR}.${SuiteSparse_VERSION_MINOR}.${SuiteSparse_VERSION_PATCH}")
+endmacro()
+
+# get SuiteSparse version
+get_SuiteSparse_Version()
+
+set(ConfigPackageLocation ${CMAKE_INSTALL_LIBDIR}/cmake/suitesparse-${SuiteSparse_VERSION})
+## create targets file
+export(EXPORT SuiteSparseTargets
+	FILE "${CMAKE_CURRENT_BINARY_DIR}/suitesparse/suitesparse-targets.cmake"
+	NAMESPACE SuiteSparse::
+)
+## create config file
+configure_file(cmake/SuiteSparse-config-install.cmake.in
+	"${CMAKE_CURRENT_BINARY_DIR}/suitesparse/suitesparse-config.cmake"
+	@ONLY
+)
 ## do the EXPORT for allowing other project to easily use suitesparse with cmake
-install(EXPORT  	SuiteSparse
-        DESTINATION cmake
-        FILE        SuiteSparse-config${LIB_POSTFIX}.cmake
+install(EXPORT SuiteSparseTargets
+	FILE
+		SuiteSparse-targets.cmake
+	NAMESPACE
+		SuiteSparse::
+	DESTINATION
+		${ConfigPackageLocation}
+)
+## write config-version file
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+	"${CMAKE_BINARY_DIR}/suitesparse/suitesparse-config-version.cmake"
+	VERSION ${SuiteSparse_VERSION}
+	COMPATIBILITY SameMajorVersion
+)
+## install config and config-version file
+install(
+	FILES
+		"${CMAKE_CURRENT_BINARY_DIR}/suitesparse/suitesparse-config.cmake"
+		"${CMAKE_CURRENT_BINARY_DIR}/suitesparse/suitesparse-config-version.cmake"
+	DESTINATION
+		${ConfigPackageLocation}
 )
